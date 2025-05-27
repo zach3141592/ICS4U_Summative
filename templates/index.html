@@ -17,105 +17,80 @@
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
-        .upload-area {
-            border: 2px dashed #dee2e6;
-            border-radius: 5px;
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 4px;
             padding: 20px;
             text-align: center;
-            margin: 20px 0;
+            background: #f8f9fa;
             cursor: pointer;
+            transition: border-color 0.3s ease;
         }
-        .upload-area:hover {
+        .drop-zone:hover {
             border-color: #0d6efd;
         }
+        .drop-zone.dragover {
+            border-color: #0d6efd;
+            background: #e9ecef;
+        }
         .results {
-            display: none;
             margin-top: 20px;
         }
-        .trait-table {
-            margin-top: 20px;
+        .sequence-card {
+            margin-bottom: 15px;
         }
-        .loading {
-            display: none;
-            text-align: center;
-            margin: 20px 0;
+        .trait-bar {
+            height: 20px;
+            background-color: #0d6efd;
+            border-radius: 4px;
+            margin-bottom: 5px;
         }
-        .problems {
-            margin-top: 20px;
+        .issues-info {
+            background-color: #f8f9fa;
             padding: 15px;
-            border-radius: 5px;
+            border-radius: 4px;
+            margin-bottom: 20px;
         }
-        .problems.warning {
-            background-color: #fff3cd;
-            border: 1px solid #ffeeba;
+        .issues-info h4 {
+            color: #0d6efd;
+            margin-bottom: 15px;
         }
-        .problems.success {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
+        .issues-list {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .issues-list li {
+            margin-bottom: 5px;
+            padding: 5px 10px;
+            background-color: #e9ecef;
+            border-radius: 4px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="container py-5">
         <h1 class="text-center mb-4">Genetic Code Optimizer</h1>
         
-        <div class="upload-area" id="dropZone">
-            <p class="mb-0">Drag and drop your CSV file here or click to select</p>
-            <input type="file" id="fileInput" accept=".csv" style="display: none;">
-        </div>
-
-        <div class="loading" id="loading">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-2">Processing your genetic sequences...</p>
-        </div>
-
-        <div class="results" id="results">
-            <div id="problemsSection"></div>
-            
-            <h3>Results</h3>
-            
-            <div class="trait-table">
-                <h4>Original Traits</h4>
-                <div class="table-responsive">
-                    <table class="table table-striped" id="originalTraits">
-                        <thead>
-                            <tr>
-                                <th>Sequence ID</th>
-                                <th>Trait 1</th>
-                                <th>Trait 2</th>
-                                <th>Trait 3</th>
-                                <th>Trait 4</th>
-                                <th>Trait 5</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="drop-zone" id="dropZone">
+                    <p class="mb-0">Drag and drop a CSV file here or click to select</p>
+                    <input type="file" id="fileInput" accept=".csv" style="display: none;">
                 </div>
-            </div>
-
-            <div class="trait-table">
-                <h4>Optimized Traits</h4>
-                <div class="table-responsive">
-                    <table class="table table-striped" id="optimizedTraits">
-                        <thead>
-                            <tr>
-                                <th>Sequence ID</th>
-                                <th>Trait 1</th>
-                                <th>Trait 2</th>
-                                <th>Trait 3</th>
-                                <th>Trait 4</th>
-                                <th>Trait 5</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+                
+                <div id="results" class="results" style="display: none;">
+                    <div class="issues-info">
+                        <h4>Sequence Analysis</h4>
+                        <div id="issuesInfo"></div>
+                    </div>
+                    
+                    <h3>Results</h3>
+                    <div id="sequenceResults"></div>
+                    
+                    <div class="text-center mt-4">
+                        <button id="downloadBtn" class="btn btn-primary">Download Optimized Sequences</button>
+                    </div>
                 </div>
-            </div>
-
-            <div class="text-center mt-4">
-                <a href="#" class="btn btn-primary" id="downloadBtn">Download Optimized Sequences</a>
             </div>
         </div>
     </div>
@@ -123,54 +98,43 @@
     <script>
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
-        const loading = document.getElementById('loading');
         const results = document.getElementById('results');
+        const sequenceResults = document.getElementById('sequenceResults');
+        const issuesInfo = document.getElementById('issuesInfo');
         const downloadBtn = document.getElementById('downloadBtn');
-        const problemsSection = document.getElementById('problemsSection');
         let currentOutputFile = null;
-
-        // Handle file selection
-        dropZone.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', handleFileSelect);
 
         // Handle drag and drop
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
-            dropZone.style.borderColor = '#0d6efd';
+            dropZone.classList.add('dragover');
         });
 
         dropZone.addEventListener('dragleave', () => {
-            dropZone.style.borderColor = '#dee2e6';
+            dropZone.classList.remove('dragover');
         });
 
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
-            dropZone.style.borderColor = '#dee2e6';
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFile(files[0]);
-            }
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            handleFile(file);
         });
 
-        function handleFileSelect(e) {
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
-            if (file) {
-                handleFile(file);
-            }
-        }
+            handleFile(file);
+        });
 
         function handleFile(file) {
-            if (!file.name.endsWith('.csv')) {
-                alert('Please upload a CSV file');
-                return;
-            }
-
+            if (!file) return;
+            
             const formData = new FormData();
             formData.append('file', file);
-
-            loading.style.display = 'block';
-            results.style.display = 'none';
-            problemsSection.innerHTML = '';
 
             fetch('/upload', {
                 method: 'POST',
@@ -184,81 +148,94 @@
                 }
 
                 currentOutputFile = data.file_id;
-                displayProblems(data.problems);
-                displayResults(data.original_traits, data.optimized_traits);
-                loading.style.display = 'none';
-                results.style.display = 'block';
+                displayResults(data);
             })
             .catch(error => {
                 console.error('Error:', error);
                 alert('An error occurred while processing the file');
-                loading.style.display = 'none';
             });
         }
 
-        function displayProblems(problems) {
-            if (Object.keys(problems).length === 0) {
-                problemsSection.innerHTML = `
-                    <div class="problems success">
-                        <h4>✓ All sequences are valid</h4>
-                        <p>No problems were found in the genetic sequences.</p>
+        function displayResults(data) {
+            // Display issues info
+            let issuesHtml = '';
+            if (data.issues_info.most_issues) {
+                issuesHtml += `
+                    <div class="mb-4">
+                        <h5>Sequence with Most Issues (${data.issues_info.most_issues.id})</h5>
+                        <p>Number of issues: ${data.issues_info.most_issues.count}</p>
+                        <ul class="issues-list">
+                            ${data.issues_info.most_issues.problems.map(problem => `<li>${problem}</li>`).join('')}
+                        </ul>
                     </div>
                 `;
-                return;
             }
-
-            let html = `
-                <div class="problems warning">
-                    <h4>⚠️ Problems Found</h4>
-                    <p>The following problems were found and automatically fixed:</p>
-                    <ul>
-            `;
-
-            for (const [sequenceId, sequenceProblems] of Object.entries(problems)) {
-                html += `<li><strong>Sequence ${sequenceId}:</strong><ul>`;
-                sequenceProblems.forEach(problem => {
-                    html += `<li>${problem}</li>`;
-                });
-                html += '</ul></li>';
+            if (data.issues_info.least_issues) {
+                issuesHtml += `
+                    <div>
+                        <h5>Sequence with Least Issues (${data.issues_info.least_issues.id})</h5>
+                        <p>Number of issues: ${data.issues_info.least_issues.count}</p>
+                        <ul class="issues-list">
+                            ${data.issues_info.least_issues.problems.map(problem => `<li>${problem}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
             }
+            issuesInfo.innerHTML = issuesHtml;
 
-            html += `
-                    </ul>
-                    <p class="mb-0">The sequences have been automatically fixed and optimized.</p>
-                </div>
-            `;
-
-            problemsSection.innerHTML = html;
+            // Display sequence results
+            let resultsHtml = '';
+            for (const [id, originalTraits] of Object.entries(data.original_traits)) {
+                const optimizedTraits = data.optimized_traits[id];
+                const problems = data.problems[id] || [];
+                
+                resultsHtml += `
+                    <div class="card sequence-card">
+                        <div class="card-body">
+                            <h5 class="card-title">Sequence ${id}</h5>
+                            ${problems.length > 0 ? `
+                                <div class="alert alert-warning">
+                                    <strong>Issues found:</strong>
+                                    <ul>
+                                        ${problems.map(problem => `<li>${problem}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Original Traits</h6>
+                                    ${originalTraits.map((trait, i) => `
+                                        <div class="mb-2">
+                                            <div class="d-flex justify-content-between">
+                                                <span>Trait ${i + 1}</span>
+                                                <span>${(trait * 100).toFixed(1)}%</span>
+                                            </div>
+                                            <div class="trait-bar" style="width: ${trait * 100}%"></div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Optimized Traits</h6>
+                                    ${optimizedTraits.map((trait, i) => `
+                                        <div class="mb-2">
+                                            <div class="d-flex justify-content-between">
+                                                <span>Trait ${i + 1}</span>
+                                                <span>${(trait * 100).toFixed(1)}%</span>
+                                            </div>
+                                            <div class="trait-bar" style="width: ${trait * 100}%"></div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            sequenceResults.innerHTML = resultsHtml;
+            results.style.display = 'block';
         }
 
-        function displayResults(originalTraits, optimizedTraits) {
-            const originalTable = document.querySelector('#originalTraits tbody');
-            const optimizedTable = document.querySelector('#optimizedTraits tbody');
-            
-            originalTable.innerHTML = '';
-            optimizedTable.innerHTML = '';
-
-            for (const [id, traits] of Object.entries(originalTraits)) {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${id}</td>
-                    ${traits.map(trait => `<td>${trait.toFixed(4)}</td>`).join('')}
-                `;
-                originalTable.appendChild(row);
-            }
-
-            for (const [id, traits] of Object.entries(optimizedTraits)) {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${id}</td>
-                    ${traits.map(trait => `<td>${trait.toFixed(4)}</td>`).join('')}
-                `;
-                optimizedTable.appendChild(row);
-            }
-        }
-
-        downloadBtn.addEventListener('click', (e) => {
-            e.preventDefault();
+        downloadBtn.addEventListener('click', () => {
             if (currentOutputFile) {
                 window.location.href = `/download/${currentOutputFile}`;
             }

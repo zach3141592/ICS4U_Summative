@@ -1,16 +1,25 @@
+"""Name: Zach Yu
+Class: ICS4U
+Date: May 26, 2025
+Teacher: Mr. K
+Description: This is a simple web app that takes in a csv file input of genetic code, 
+identifies the issues in the genetic code, and uses machine learning to optimize the code.
+This new code is then outputted as a csv file.
+"""
 from flask import Flask, render_template, request, send_file, jsonify
 import os
-import pandas as pd
+import pandas as pd #for file handling and data manipulation
 import numpy as np
-from genetic_parser import GeneticParser
-from neural_network import TraitPredictor
-from optimizer import GeneticOptimizer
-import tempfile
-import traceback
+from genetic_parser import GeneticParser #instanciate objects
+from neural_network import TraitPredictor  #instanciate objects
+from optimizer import GeneticOptimizer #instanciate objects
+import tempfile #temporary file storage
+import traceback #error handling
+#dependencies
 
 app = Flask(__name__)
 
-# Initialize components
+# initialize genetic parser object
 genetic_parser = GeneticParser()
 
 # Store temporary files
@@ -23,11 +32,11 @@ def index():
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
-        return jsonify({'error': 'No file uploaded'}), 400
+        return jsonify({'error': 'No file part'}), 400
     
     file = request.files['file']
     if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
+        return jsonify({'error': 'No selected file'}), 400
     
     if not file.filename.endswith('.csv'):
         return jsonify({'error': 'Please upload a CSV file'}), 400
@@ -38,26 +47,40 @@ def upload_file():
         file.save(temp_input.name)
         temp_input.close()
         
-        # Read sequences and validate
+        # Parse and validate sequences
         sequences, problems = genetic_parser.read_csv(temp_input.name)
         
-        if not sequences:
-            return jsonify({'error': 'No valid sequences found in the file'}), 400
-            
-        # Get the maximum sequence length
-        max_length = max(len(seq) for seq in sequences.values())
+        # Find sequences with most and least issues
+        if problems:
+            most_issues = max(problems.items(), key=lambda x: len(x[1]))
+            least_issues = min(problems.items(), key=lambda x: len(x[1]))
+            issues_info = {
+                'most_issues': {
+                    'id': most_issues[0],
+                    'count': len(most_issues[1]),
+                    'problems': most_issues[1]
+                },
+                'least_issues': {
+                    'id': least_issues[0],
+                    'count': len(least_issues[1]),
+                    'problems': least_issues[1]
+                }
+            }
+        else:
+            issues_info = {
+                'most_issues': None,
+                'least_issues': None
+            }
         
-        # Initialize predictor with the maximum sequence length
-        predictor = TraitPredictor(sequence_length=max_length, num_traits=5)
-        
-        # Generate random target traits
-        target_traits = np.random.random(5)
-        
-        # Initialize optimizer and optimize sequences
+        # Create trait predictor and optimizer
+        predictor = TraitPredictor(sequence_length=len(next(iter(sequences.values()))), num_traits=5)
+        target_traits = np.array([0.8, 0.6, 0.7, 0.9, 0.5])  # Example target traits
         optimizer = GeneticOptimizer(predictor, target_traits)
+        
+        # Optimize sequences
         optimized_sequences = optimizer.optimize_multiple_sequences(sequences)
         
-        # Save optimized sequences
+        # Save optimized sequences to temporary file
         temp_output = tempfile.NamedTemporaryFile(delete=False, suffix='.csv')
         genetic_parser.write_csv(temp_output.name, optimized_sequences)
         temp_output.close()
@@ -66,38 +89,33 @@ def upload_file():
         file_id = os.path.basename(temp_output.name)
         temp_files[file_id] = temp_output.name
         
-        # Get trait predictions for original sequences
+        # Get trait predictions for original and optimized sequences
         original_traits = {}
-        for name, sequence in sequences.items():
-            try:
-                traits = predictor.predict_traits(sequence)
-                original_traits[name] = traits.tolist()
-            except Exception as e:
-                print(f"Error predicting traits for sequence {name}: {str(e)}")
-                continue
-        
-        # Get trait predictions for optimized sequences
         optimized_traits = {}
-        for name, sequence in optimized_sequences.items():
-            try:
-                traits = predictor.predict_traits(sequence)
-                optimized_traits[name] = traits.tolist()
-            except Exception as e:
-                print(f"Error predicting traits for optimized sequence {name}: {str(e)}")
-                continue
         
-        # Clean up temporary input file
+        for seq_id, sequence in sequences.items():
+            try:
+                original_traits[seq_id] = predictor.predict_traits(sequence).tolist()
+                optimized_traits[seq_id] = predictor.predict_traits(optimized_sequences[seq_id]).tolist()
+            except Exception as e:
+                print(f"Error predicting traits for sequence {seq_id}: {str(e)}")
+                original_traits[seq_id] = []
+                optimized_traits[seq_id] = []
+        
+        # Clean up input file
         os.unlink(temp_input.name)
         
         return jsonify({
-            'original_traits': original_traits,
-            'optimized_traits': optimized_traits,
+            'success': True,
+            'file_id': file_id,
             'problems': problems,
-            'file_id': file_id
+            'issues_info': issues_info,
+            'original_traits': original_traits,
+            'optimized_traits': optimized_traits
         })
         
     except Exception as e:
-        print("Error details:")
+        print(f"Error processing file: {str(e)}")
         print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 

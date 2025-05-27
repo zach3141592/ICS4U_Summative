@@ -20,7 +20,7 @@ class GeneticParser:
         """Convert numerical representation back to DNA sequence."""
         return ''.join(self.reverse_nucleotides[n] for n in sequence)
     
-    def validate_sequence(self, sequence: str) -> Dict[str, List[str]]:
+    def validate_sequence(self, sequence: str) -> List[str]:
         """Validate a genetic sequence and return any problems found."""
         problems = []
         
@@ -72,6 +72,25 @@ class GeneticParser:
         
         return sequence
     
+    def bubble_sort_sequences(self, sequences: Dict[str, np.ndarray], 
+                            problems: Dict[str, List[str]]) -> Tuple[Dict[str, np.ndarray], Dict[str, List[str]]]:
+        """Sort sequences by number of issues using bubble sort."""
+        # Convert to list of tuples for sorting
+        seq_list = [(id, seq, problems.get(id, [])) for id, seq in sequences.items()]
+        
+        # Bubble sort
+        n = len(seq_list)
+        for i in range(n):
+            for j in range(0, n-i-1):
+                if len(seq_list[j][2]) < len(seq_list[j+1][2]):
+                    seq_list[j], seq_list[j+1] = seq_list[j+1], seq_list[j]
+        
+        # Convert back to dictionaries
+        sorted_sequences = {id: seq for id, seq, _ in seq_list}
+        sorted_problems = {id: probs for id, _, probs in seq_list}
+        
+        return sorted_sequences, sorted_problems
+    
     def read_csv(self, filename: str, sequence_column: str = 'sequence', 
                 id_column: str = 'id') -> Tuple[Dict[str, np.ndarray], Dict[str, List[str]]]:
         """Read genetic sequences from a CSV file and validate them."""
@@ -102,6 +121,9 @@ class GeneticParser:
                     sequences[sequence_id] = self.parse_sequence(fixed_sequence)
                 else:
                     sequences[sequence_id] = self.parse_sequence(sequence)
+            
+            # Sort sequences by number of issues
+            sequences, problems = self.bubble_sort_sequences(sequences, problems)
             
             return sequences, problems
             
