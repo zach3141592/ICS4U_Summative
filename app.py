@@ -50,6 +50,12 @@ def upload_file():
         # Parse and validate sequences
         sequences, problems = genetic_parser.read_csv(temp_input.name)
         
+        # Get sequence processing history
+        sequence_history = {
+            seq_id: genetic_parser.get_sequence_history(seq_id)
+            for seq_id in sequences.keys()
+        }
+        
         # Find sequences with most and least issues
         if problems:
             most_issues = max(problems.items(), key=lambda x: len(x[1]))
@@ -58,12 +64,14 @@ def upload_file():
                 'most_issues': {
                     'id': most_issues[0],
                     'count': len(most_issues[1]),
-                    'problems': most_issues[1]
+                    'problems': most_issues[1],
+                    'history': sequence_history[most_issues[0]]
                 },
                 'least_issues': {
                     'id': least_issues[0],
                     'count': len(least_issues[1]),
-                    'problems': least_issues[1]
+                    'problems': least_issues[1],
+                    'history': sequence_history[least_issues[0]]
                 }
             }
         else:
@@ -72,13 +80,39 @@ def upload_file():
                 'least_issues': None
             }
         
-        # Create trait predictor and optimizer
-        predictor = TraitPredictor(sequence_length=len(next(iter(sequences.values()))), num_traits=5)
+        # Create trait predictor with fixed sequence length to match training data
+        sequence_length = 21  # Fixed sequence length to match training data
+        print(f"Creating TraitPredictor with sequence_length={sequence_length}")
+        predictor = TraitPredictor(sequence_length=sequence_length, num_traits=5)
+        
+        # Pad or truncate sequences to match the required length
+        processed_sequences = {}
+        for seq_id, sequence in sequences.items():
+            if isinstance(sequence, np.ndarray):
+                seq = sequence.flatten()
+            else:
+                seq = np.array(sequence)
+            
+            if len(seq) < sequence_length:
+                # Pad with zeros if sequence is too short
+                padded_seq = np.pad(seq, (0, sequence_length - len(seq)))
+                processed_sequences[seq_id] = padded_seq
+            elif len(seq) > sequence_length:
+                # Truncate if sequence is too long
+                processed_sequences[seq_id] = seq[:sequence_length]
+            else:
+                processed_sequences[seq_id] = seq
+        
+        # Train the neural network
+        print("Training neural network...")
+        losses = predictor.train(epochs=1000, batch_size=32)
+        print(f"Training completed. Final loss: {losses[-1]:.4f}")
+        
         target_traits = np.array([0.8, 0.6, 0.7, 0.9, 0.5])  # Example target traits
         optimizer = GeneticOptimizer(predictor, target_traits)
         
         # Optimize sequences
-        optimized_sequences = optimizer.optimize_multiple_sequences(sequences)
+        optimized_sequences = optimizer.optimize_multiple_sequences(processed_sequences)
         
         # Save optimized sequences to temporary file
         temp_output = tempfile.NamedTemporaryFile(delete=False, suffix='.csv')
@@ -93,7 +127,7 @@ def upload_file():
         original_traits = {}
         optimized_traits = {}
         
-        for seq_id, sequence in sequences.items():
+        for seq_id, sequence in processed_sequences.items():
             try:
                 original_traits[seq_id] = predictor.predict_traits(sequence).tolist()
                 optimized_traits[seq_id] = predictor.predict_traits(optimized_sequences[seq_id]).tolist()
@@ -111,7 +145,9 @@ def upload_file():
             'problems': problems,
             'issues_info': issues_info,
             'original_traits': original_traits,
-            'optimized_traits': optimized_traits
+            'optimized_traits': optimized_traits,
+            'sequence_history': sequence_history,
+            'training_loss': losses[-1]
         })
         
     except Exception as e:

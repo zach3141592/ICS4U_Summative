@@ -164,9 +164,21 @@
                     <div class="mb-4">
                         <h5>Sequence with Most Issues (${data.issues_info.most_issues.id})</h5>
                         <p>Number of issues: ${data.issues_info.most_issues.count}</p>
-                        <ul class="issues-list">
-                            ${data.issues_info.most_issues.problems.map(problem => `<li>${problem}</li>`).join('')}
-                        </ul>
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">Processing History</h6>
+                            </div>
+                            <div class="card-body">
+                                <h6>Original Problems:</h6>
+                                <ul class="issues-list">
+                                    ${data.issues_info.most_issues.problems.map(problem => `<li>${problem}</li>`).join('')}
+                                </ul>
+                                <h6>Optimization Steps:</h6>
+                                <ul class="issues-list">
+                                    ${data.issues_info.most_issues.history.optimization_steps.map(step => `<li>${step}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 `;
             }
@@ -175,19 +187,47 @@
                     <div>
                         <h5>Sequence with Least Issues (${data.issues_info.least_issues.id})</h5>
                         <p>Number of issues: ${data.issues_info.least_issues.count}</p>
-                        <ul class="issues-list">
-                            ${data.issues_info.least_issues.problems.map(problem => `<li>${problem}</li>`).join('')}
-                        </ul>
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">Processing History</h6>
+                            </div>
+                            <div class="card-body">
+                                <h6>Original Problems:</h6>
+                                <ul class="issues-list">
+                                    ${data.issues_info.least_issues.problems.map(problem => `<li>${problem}</li>`).join('')}
+                                </ul>
+                                <h6>Optimization Steps:</h6>
+                                <ul class="issues-list">
+                                    ${data.issues_info.least_issues.history.optimization_steps.map(step => `<li>${step}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 `;
             }
             issuesInfo.innerHTML = issuesHtml;
+
+            // Display training information
+            if (data.training_loss !== undefined) {
+                issuesInfo.innerHTML += `
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">Neural Network Training</h6>
+                        </div>
+                        <div class="card-body">
+                            <p>Final training loss: ${data.training_loss.toFixed(4)}</p>
+                            <p class="text-muted small">The neural network was trained on 1000 synthetic sequences to learn genetic patterns.</p>
+                        </div>
+                    </div>
+                `;
+            }
 
             // Display sequence results
             let resultsHtml = '';
             for (const [id, originalTraits] of Object.entries(data.original_traits)) {
                 const optimizedTraits = data.optimized_traits[id];
                 const problems = data.problems[id] || [];
+                const history = data.sequence_history[id];
                 
                 resultsHtml += `
                     <div class="card sequence-card">
@@ -201,6 +241,17 @@
                                     </ul>
                                 </div>
                             ` : ''}
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Processing History</h6>
+                                </div>
+                                <div class="card-body">
+                                    <h6>Optimization Steps:</h6>
+                                    <ul class="issues-list">
+                                        ${history.optimization_steps.map(step => `<li>${step}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            </div>
                             <div class="row">
                                 <div class="col-md-6">
                                     <h6>Original Traits</h6>
