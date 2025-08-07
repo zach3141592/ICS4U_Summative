@@ -1,6 +1,6 @@
 # Genetic Code Optimizer
 
-A web application that analyzes and optimizes genetic sequences using neural networks. The application can identify problems in genetic code, fix them automatically, and optimize the sequences for desired traits.
+A web application that analyzes and optimizes genetic sequences using neural networks. The application can identify problems in genetic code, fix them automatically using ML, and optimize the sequences for desired traits.
 
 ## Features
 
